@@ -64,7 +64,7 @@ Metrics for Namespace: networking
 | ...                                       | ...                      | ...       | ...         | ...       | ...       | ...         | ...       |                |
 
 ## Demo
-[![KtopGif](https://github.com/VegaCorporoptions/Ktop/assets/116181531/3e3d5abb-db85-4f58-8842-7f4d509d7fbe)](https://github.com/VegaCorporoptions/Ktop/blob/main/Ktop.gif?raw=true)
+![KtopGif](https://github.com/VegaCorporoptions/Ktop/blob/ec55df55d3c6fe7a72155b030927d419daa019dd/ktop.gif)
 
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.
