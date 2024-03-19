@@ -140,7 +140,7 @@ func printNodeMetrics(node corev1.Node) {
 	NodeRow := []string{
 		nodeName,
 		cpuTotalCapacity,
-		units.HumanSize(float64(memoryTotalCapacity)),
+		units.BytesSize(float64(memoryTotalCapacity)),
 	}
 	nodeTableData = append(nodeTableData, NodeRow)
 
@@ -171,13 +171,14 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	// Créer un tableau pour stocker les données des pods sur ce nœud
 	var podTableData [][]string
 	var totalTableData [][]string
-	// Initialiser les colonnes avec des en-têtes
-	podTableData = append(podTableData, []string{fmt.Sprintf("Pods on %s", node.Name), "Container", "CPU Usage", "CPU Request", "CPU Limit", "Mem Usage", "Mem Request", "Mem Limit", "Spot Tolerance"})
-	totalTableData = append(totalTableData, []string{"Pod total capacity on Node", "CPU Request", "Mem Request"})
 
 	// Variables pour le cumul des métriques
 	var totalCPUUsage, totalCPURequest, totalCPULimit int64
 	var totalMemoryUsage, totalMemoryRequest, totalMemoryLimit int64
+
+	// Initialiser les colonnes avec des en-têtes
+	podTableData = append(podTableData, []string{fmt.Sprintf("Pods on %s", node.Name), "Container", "CPU Usage", "CPU Request", "CPU Limit", "Mem Usage", "Mem Request", "Mem Limit", "Spot Tolerance"})
+	totalTableData = append(totalTableData, []string{"Pod total capacity on Node", "CPU Request", "Mem Request"})
 
 	// Obtenir les métriques de performance pour chaque pod sur ce nœud
 	for _, pod := range pods.Items {
@@ -208,7 +209,6 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 			}
 
 			if containerSpec.Name == "" {
-				// Container spécifié dans les métriques mais pas dans la spécification, erreur ?
 				continue
 			}
 
@@ -250,9 +250,9 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 				fmt.Sprintf("%d m", cpuUsage),
 				fmt.Sprintf("%d m", cpuRequest),
 				fmt.Sprintf("%d m", cpuLimit),
-				units.HumanSize(float64(memoryUsage)),
-				units.HumanSize(float64(memoryRequest)),
-				units.HumanSize(float64(memoryLimit)),
+				units.BytesSize(float64(memoryUsage)),
+				units.BytesSize(float64(memoryRequest)),
+				units.BytesSize(float64(memoryLimit)),
 				spotToleration,
 			}
 			podTableData = append(podTableData, row)
@@ -271,9 +271,9 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	FormattedTotalCPUUsage := fmt.Sprintf("%d m", totalCPUUsage)
 	formattedTotalCPURequest := fmt.Sprintf("%d m", totalCPURequest)
 	formattedTotalCPULimit := fmt.Sprintf("%d m", totalCPULimit)
-	formattedTotalMemoryUsage := units.HumanSize(float64(totalMemoryUsage))
-	formattedTotalMemoryRequest := units.HumanSize(float64(totalMemoryRequest))
-	formattedTotalMemoryLimit := units.HumanSize(float64(totalMemoryLimit))
+	formattedTotalMemoryUsage := units.BytesSize(float64(totalMemoryUsage))
+	formattedTotalMemoryRequest := units.BytesSize(float64(totalMemoryRequest))
+	formattedTotalMemoryLimit := units.BytesSize(float64(totalMemoryLimit))
 
 	// Ajouter une ligne pour le total
 	totalPods := []string{
