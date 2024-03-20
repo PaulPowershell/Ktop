@@ -132,18 +132,22 @@ func printNodeMetrics(node corev1.Node) {
 	// Créer un tableau pour stocker les données des pods sur ce nœud
 	var nodeTableData [][]string
 	// Initialiser les colonnes avec des en-têtes
-	nodeTableData = append(nodeTableData, []string{"Node", "CPU Capacity", "Mem Capacity"})
+	nodeTableData = append(nodeTableData, []string{"Node", "CPU Capacity", "CPU Allocatable", "Mem Capacity", "Mem Allocatable"})
 
 	// Récupérer les ressources allocatables du nœud
 	nodeName := node.Name
 	cpuTotalCapacity := fmt.Sprintf("%d m", node.Status.Capacity.Cpu().MilliValue())
+	cpuTotalUsage := fmt.Sprintf("%d m", node.Status.Allocatable.Cpu().MilliValue())
 	memoryTotalCapacity := node.Status.Capacity.Memory().Value()
+	memoryTotalUsage := node.Status.Allocatable.Memory().Value()
 
 	// Ajouter une ligne pour le total
 	NodeRow := []string{
 		nodeName,
 		cpuTotalCapacity,
+		cpuTotalUsage,
 		units.BytesSize(float64(memoryTotalCapacity)),
+		units.BytesSize(float64(memoryTotalUsage)),
 	}
 	nodeTableData = append(nodeTableData, NodeRow)
 
@@ -183,7 +187,7 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 
 	// Initialiser les colonnes avec des en-têtes
 	podTableData = append(podTableData, []string{fmt.Sprintf("Pods on %s", node.Name), "Container", "CPU Usage", "CPU Request", "CPU Limit", "Mem Usage", "Mem Request", "Mem Limit", "Spot Tolerance"})
-	totalTableData = append(totalTableData, []string{"Pod total capacity on Node", "CPU Request", "Mem Request"})
+	totalTableData = append(totalTableData, []string{"Pod total capacity on Node", "CPU Usage", "CPU Request", "Mem Usage", "Mem Request"})
 
 	// Obtenir les métriques de performance pour chaque pod sur ce nœud
 	for _, pod := range pods.Items {
@@ -220,21 +224,20 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 			requests := containerSpec.Resources.Requests
 			limits := containerSpec.Resources.Limits
 
-			// Attribuer des metrics aux valeurs (Mo/Mi)
 			containerName := containerMetrics.Name
 			cpuUsage := usage.Cpu().MilliValue()
-			if requests.Cpu().MilliValue() == 0 {
-				cpuRequest = cpuUsage
-			} else {
-				cpuRequest = requests.Cpu().MilliValue()
-			}
+			// if requests.Cpu().MilliValue() == 0 {
+			// 	cpuRequest = cpuUsage
+			// } else {
+			cpuRequest = requests.Cpu().MilliValue()
+			// }
 			cpuLimit := limits.Cpu().MilliValue()
 			memoryUsage := usage.Memory().Value()
-			if requests.Memory().Value() == 0 {
-				memoryRequest = memoryUsage
-			} else {
-				memoryRequest = requests.Memory().Value()
-			}
+			// if requests.Memory().Value() == 0 {
+			// 	memoryRequest = memoryUsage
+			// } else {
+			memoryRequest = requests.Memory().Value()
+			// }
 			memoryLimit := limits.Memory().Value()
 
 			// Vérifier si l'annotation de tolérance spot est présente
@@ -298,7 +301,9 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	// Ajouter une ligne pour le total
 	totalRow := []string{
 		node.Name,
+		FormattedTotalCPUUsage,
 		formattedTotalCPURequest,
+		formattedTotalMemoryUsage,
 		formattedTotalMemoryRequest,
 	}
 	totalTableData = append(totalTableData, totalRow)
