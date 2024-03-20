@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/go-units"
@@ -29,6 +30,7 @@ const (
 
 var (
 	nodeName string
+	lock     = &sync.Mutex{}
 )
 
 func printHelp() {
@@ -117,6 +119,7 @@ func main() {
 	}
 
 	if len(errorsList) > 0 {
+		fmt.Print("\033[2K\r")
 		fmt.Printf("\nError(s) :\n")
 		for i, err := range errorsList {
 			fmt.Printf("%d. %v\n", i+1, err)
@@ -147,8 +150,10 @@ func printNodeMetrics(node corev1.Node) {
 	// charger les fonctions de formatage
 	printDataRow, printDelimiterRow, printTopDelimiterRow, printBottomDelimiterRow := loadFunctions(nodeTableData)
 
+	lock.Lock()
 	// Affiche les résultats sous forme de tableau pour les pods sur ce nœud
 	runFunctions(printTopDelimiterRow, printDataRow, nodeTableData, printDelimiterRow, printBottomDelimiterRow)
+	lock.Unlock()
 }
 
 // printPodMetrics récupère et affiche les métriques de performance des pods pour un nœud spécifié.
@@ -298,6 +303,7 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	}
 	totalTableData = append(totalTableData, totalRow)
 
+	lock.Lock()
 	if nodeName == "" {
 		// charger les fonctions de formatage
 		printDataRow, printDelimiterRow, printTopDelimiterRow, printBottomDelimiterRow := loadFunctions(totalTableData)
@@ -309,6 +315,7 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 		// Affiche les résultats sous forme de tableau pour les pods sur ce nœud
 		runFunctions(printTopDelimiterRow, printDataRow, podTableData, printDelimiterRow, printBottomDelimiterRow)
 	}
+	lock.Unlock()
 }
 
 func runFunctions(printTopDelimiterRow func(), printDataRow func(row []string), tableData [][]string, printDelimiterRow func(), printBottomDelimiterRow func()) {
@@ -412,11 +419,14 @@ func loadKubeConfig() (*rest.Config, error) {
 	return config, nil
 }
 
+// goSpinner lance un spinner de progression en cours d'exécution en arrière-plan.
 func goSpinner() {
 	chars := []string{"|", "/", "-", "\\"}
 	i := 0
 	for {
+		lock.Lock()
 		fmt.Printf("\r%s ", chars[i])
+		lock.Unlock()
 		i = (i + 1) % len(chars)
 		time.Sleep(100 * time.Millisecond) // Réglez la vitesse de rotation ici
 	}
