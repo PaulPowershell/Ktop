@@ -226,18 +226,10 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 
 			containerName := containerMetrics.Name
 			cpuUsage := usage.Cpu().MilliValue()
-			// if requests.Cpu().MilliValue() == 0 {
-			// 	cpuRequest = cpuUsage
-			// } else {
 			cpuRequest = requests.Cpu().MilliValue()
-			// }
 			cpuLimit := limits.Cpu().MilliValue()
 			memoryUsage := usage.Memory().Value()
-			// if requests.Memory().Value() == 0 {
-			// 	memoryRequest = memoryUsage
-			// } else {
 			memoryRequest = requests.Memory().Value()
-			// }
 			memoryLimit := limits.Memory().Value()
 
 			// Vérifier si l'annotation de tolérance spot est présente
