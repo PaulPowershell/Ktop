@@ -8,11 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/docker/go-units"
-	"github.com/schollz/progressbar/v3"
+	"github.com/pterm/pterm"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -30,7 +28,6 @@ const (
 
 var (
 	nodeName string
-	lock     = &sync.Mutex{}
 )
 
 func printHelp() {
@@ -47,6 +44,12 @@ func printHelp() {
 }
 
 func main() {
+	// Create a multi printer instance
+	multi := pterm.DefaultMultiPrinter
+	spinner, _ := pterm.DefaultSpinner.WithWriter(multi.NewWriter()).Start("Initialization running")
+	// Start the multi printer
+	multi.Start()
+
 	// Initialisation d'un tableau pour stocker les erreurs
 	var errorsList []error
 
@@ -60,9 +63,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Démarre le spinner de progression
-	go goSpinner()
-
 	// Vérifier si un argument non associé à un drapeau est passé
 	if nodeFlag != "" {
 		nodeName = nodeFlag
@@ -72,12 +72,16 @@ func main() {
 	ctx := context.Background()
 
 	if err != nil {
+		spinner.Fail("Initialization error")
+		multi.Stop()
 		log.Fatalf("Erreur lors du chargement de la configuration Kubernetes: %v\n", err)
 		os.Exit(1)
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
+		spinner.Fail("Initialization error")
+		multi.Stop()
 		log.Fatalf("Erreur lors de la création du client Kubernetes: %v\n", err)
 		os.Exit(1)
 	}
@@ -85,6 +89,8 @@ func main() {
 	// Création du clientset pour les métriques Kubernetes
 	metricsClientset, err := metricsv.NewForConfig(config)
 	if err != nil {
+		spinner.Fail("Initialization error")
+		multi.Stop()
 		fmt.Printf("Error creating Kubernetes metrics clientset: %v\n", err)
 		return
 	}
@@ -92,6 +98,8 @@ func main() {
 	// Récupérer la liste des nœuds
 	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
+		spinner.Fail("Initialization error")
+		multi.Stop()
 		fmt.Printf("Error retrieving nodes: %v\n", err)
 		return
 	}
@@ -105,21 +113,26 @@ func main() {
 		}
 	}
 
+	// Stop spinner 1 with a success message.
+	spinner.Success("Initialization done")
+	// Stop the multi printer. This will stop printing all the spinners.
+	multi.Stop()
+
 	if foundNode == nil {
 		// Afficher les métriques pour chaque nœud
 		for _, node := range nodes.Items {
-			fmt.Println("\033[2K\r")
 			printPodMetrics(node, clientset, metricsClientset, &errorsList)
 			printNodeMetrics(node)
+			fmt.Println()
 		}
 	} else {
 		// Afficher les métriques pour le nœud spécifié
 		printPodMetrics(*foundNode, clientset, metricsClientset, &errorsList)
 		printNodeMetrics(*foundNode)
+		fmt.Println()
 	}
 
 	if len(errorsList) > 0 {
-		fmt.Print("\033[2K\r")
 		fmt.Printf("\nError(s) :\n")
 		for i, err := range errorsList {
 			fmt.Printf("%d. %v\n", i+1, err)
@@ -154,10 +167,8 @@ func printNodeMetrics(node corev1.Node) {
 	// charger les fonctions de formatage
 	printDataRow, printDelimiterRow, printTopDelimiterRow, printBottomDelimiterRow := loadFunctions(nodeTableData)
 
-	lock.Lock()
 	// Affiche les résultats sous forme de tableau pour les pods sur ce nœud
 	runFunctions(printTopDelimiterRow, printDataRow, nodeTableData, printDelimiterRow, printBottomDelimiterRow)
-	lock.Unlock()
 }
 
 // printPodMetrics récupère et affiche les métriques de performance des pods pour un nœud spécifié.
@@ -171,11 +182,7 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	}
 
 	// Initialiser la bar de progression
-	bar := progressbar.NewOptions(len(pods.Items),
-		progressbar.OptionClearOnFinish(),
-		progressbar.OptionFullWidth(),
-		progressbar.OptionShowCount(),
-	)
+	bar, _ := pterm.DefaultProgressbar.WithTotal(len(pods.Items)).WithTitle("Running").WithRemoveWhenDone().Start()
 
 	// Créer un tableau pour stocker les données des pods sur ce nœud
 	var podTableData [][]string
@@ -192,7 +199,7 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	// Obtenir les métriques de performance pour chaque pod sur ce nœud
 	for _, pod := range pods.Items {
 		// Increment de la bar de progression
-		bar.Add(1)
+		bar.Increment()
 
 		// Obtenir les métriques de performance du pod
 		podMetrics, err := metricsClientset.MetricsV1beta1().PodMetricses(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -300,7 +307,6 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	}
 	totalTableData = append(totalTableData, totalRow)
 
-	lock.Lock()
 	if nodeName == "" {
 		// charger les fonctions de formatage
 		printDataRow, printDelimiterRow, printTopDelimiterRow, printBottomDelimiterRow := loadFunctions(totalTableData)
@@ -312,13 +318,9 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 		// Affiche les résultats sous forme de tableau pour les pods sur ce nœud
 		runFunctions(printTopDelimiterRow, printDataRow, podTableData, printDelimiterRow, printBottomDelimiterRow)
 	}
-	lock.Unlock()
 }
 
 func runFunctions(printTopDelimiterRow func(), printDataRow func(row []string), tableData [][]string, printDelimiterRow func(), printBottomDelimiterRow func()) {
-	// Supprime la derniere ligne du spinner
-	fmt.Print("\033[2K\r")
-
 	// Imprimer la ligne de délimitation du haut
 	printTopDelimiterRow()
 
@@ -415,17 +417,4 @@ func loadKubeConfig() (*rest.Config, error) {
 		return nil, err
 	}
 	return config, nil
-}
-
-// goSpinner lance un spinner de progression en cours d'exécution en arrière-plan.
-func goSpinner() {
-	chars := []string{"|", "/", "-", "\\"}
-	i := 0
-	for {
-		lock.Lock()
-		fmt.Printf("\r%s ", chars[i])
-		lock.Unlock()
-		i = (i + 1) % len(chars)
-		time.Sleep(100 * time.Millisecond) // Réglez la vitesse de rotation ici
-	}
 }
