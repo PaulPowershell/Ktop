@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/docker/go-units"
 	"github.com/pterm/pterm"
@@ -142,10 +141,10 @@ func main() {
 
 // printNodeMetrics affiche les métriques de performance pour un nœud spécifié.
 func printNodeMetrics(node corev1.Node) {
-	// Créer un tableau pour stocker les données des pods sur ce nœud
-	var nodeTableData [][]string
 	// Initialiser les colonnes avec des en-têtes
-	nodeTableData = append(nodeTableData, []string{"Node", "CPU Capacity", "CPU Allocatable", "Mem Capacity", "Mem Allocatable"})
+	nodeTableData := pterm.TableData{
+		{"Node", "CPU Capacity", "CPU Allocatable", "Mem Capacity", "Mem Allocatable"},
+	}
 
 	// Récupérer les ressources allocatables du nœud
 	nodeName := node.Name
@@ -154,21 +153,17 @@ func printNodeMetrics(node corev1.Node) {
 	memoryTotalCapacity := node.Status.Capacity.Memory().Value()
 	memoryTotalUsage := node.Status.Allocatable.Memory().Value()
 
-	// Ajouter une ligne pour le total
-	NodeRow := []string{
+	// Ajoute une ligne pour le total
+	totalRow := []string{
 		nodeName,
 		cpuTotalCapacity,
 		cpuTotalUsage,
 		units.BytesSize(float64(memoryTotalCapacity)),
 		units.BytesSize(float64(memoryTotalUsage)),
 	}
-	nodeTableData = append(nodeTableData, NodeRow)
+	nodeTableData = append(nodeTableData, totalRow)
 
-	// charger les fonctions de formatage
-	printDataRow, printDelimiterRow, printTopDelimiterRow, printBottomDelimiterRow := loadFunctions(nodeTableData)
-
-	// Affiche les résultats sous forme de tableau pour les pods sur ce nœud
-	runFunctions(printTopDelimiterRow, printDataRow, nodeTableData, printDelimiterRow, printBottomDelimiterRow)
+	pterm.DefaultTable.WithHeaderRowSeparator("─").WithBoxed().WithHasHeader().WithData(nodeTableData).Render()
 }
 
 // printPodMetrics récupère et affiche les métriques de performance des pods pour un nœud spécifié.
@@ -185,8 +180,8 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	bar, _ := pterm.DefaultProgressbar.WithTotal(len(pods.Items)).WithTitle("Running").WithRemoveWhenDone().Start()
 
 	// Créer un tableau pour stocker les données des pods sur ce nœud
-	var podTableData [][]string
-	var totalTableData [][]string
+	var podTableData pterm.TableData
+	var totalTableData pterm.TableData
 
 	// Variables pour le cumul des métriques
 	var totalCPUUsage, totalCPURequest, totalCPULimit int64
@@ -294,7 +289,6 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 		formattedTotalMemoryLimit,
 		"",
 	}
-
 	podTableData = append(podTableData, totalPods)
 
 	// Ajouter une ligne pour le total
@@ -308,104 +302,10 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	totalTableData = append(totalTableData, totalRow)
 
 	if nodeName == "" {
-		// charger les fonctions de formatage
-		printDataRow, printDelimiterRow, printTopDelimiterRow, printBottomDelimiterRow := loadFunctions(totalTableData)
-		// Affiche les résultats sous forme de tableau pour les pods sur ce nœud
-		runFunctions(printTopDelimiterRow, printDataRow, totalTableData, printDelimiterRow, printBottomDelimiterRow)
+		pterm.DefaultTable.WithHeaderRowSeparator("─").WithBoxed().WithHasHeader().WithData(totalTableData).Render()
 	} else {
-		// charger les fonctions de formatage
-		printDataRow, printDelimiterRow, printTopDelimiterRow, printBottomDelimiterRow := loadFunctions(podTableData)
-		// Affiche les résultats sous forme de tableau pour les pods sur ce nœud
-		runFunctions(printTopDelimiterRow, printDataRow, podTableData, printDelimiterRow, printBottomDelimiterRow)
+		pterm.DefaultTable.WithHeaderRowSeparator("─").WithBoxed().WithHasHeader().WithData(podTableData).Render()
 	}
-}
-
-func runFunctions(printTopDelimiterRow func(), printDataRow func(row []string), tableData [][]string, printDelimiterRow func(), printBottomDelimiterRow func()) {
-	// Imprimer la ligne de délimitation du haut
-	printTopDelimiterRow()
-
-	// Imprimer les en-têtes
-	printDataRow(tableData[0])
-
-	// Imprimer la ligne de délimitation du haut
-	printDelimiterRow()
-
-	// Imprimer les données à partir de la deuxième ligne
-	for _, row := range tableData[1:] {
-		printDataRow(row)
-	}
-	// Imprimer la ligne de délimitation du bas
-	printBottomDelimiterRow()
-}
-
-// voir pour utiliser https://github.com/olekukonko/tablewriter
-func loadFunctions(tableData [][]string) (func(row []string), func(), func(), func()) {
-	alternateColor := true
-	var color string
-
-	// Calculer la largeur maximale de chaque colonne
-	columnWidths := make([]int, len(tableData[0]))
-	for _, row := range tableData {
-		for i, cell := range row {
-			cellLength := len(cell)
-			if cellLength > columnWidths[i] {
-				columnWidths[i] = cellLength
-			}
-		}
-	}
-
-	// Fonction pour imprimer une ligne de données avec délimitation
-	printDataRow := func(row []string) {
-		fmt.Print("│")
-		if alternateColor {
-			color = "" // No color background
-		} else {
-			color = "\033[48;5;238m" // Light gray background
-		}
-		for i, cell := range row {
-			formatString := fmt.Sprintf("%s %%-%ds \033[0m│", color, columnWidths[i])
-			fmt.Printf(formatString, cell)
-		}
-		alternateColor = !alternateColor
-		fmt.Println("")
-	}
-
-	// Fonction pour imprimer une ligne de délimitation
-	printDelimiterRow := func() {
-		fmt.Print("├")
-		for i, width := range columnWidths {
-			fmt.Print(strings.Repeat("─", width+2))
-			if i < len(columnWidths)-1 {
-				fmt.Print("┼")
-			}
-		}
-		fmt.Println("┤")
-	}
-
-	// Fonction pour imprimer la ligne de délimitation du haut
-	printTopDelimiterRow := func() {
-		fmt.Print("┌")
-		for i, width := range columnWidths {
-			fmt.Print(strings.Repeat("─", width+2))
-			if i < len(columnWidths)-1 {
-				fmt.Print("┬")
-			}
-		}
-		fmt.Println("┐")
-	}
-
-	// Fonction pour imprimer la ligne de délimitation du bas
-	printBottomDelimiterRow := func() {
-		fmt.Print("└")
-		for i, width := range columnWidths {
-			fmt.Print(strings.Repeat("─", width+2))
-			if i < len(columnWidths)-1 {
-				fmt.Print("┴")
-			}
-		}
-		fmt.Println("┘")
-	}
-	return printDataRow, printDelimiterRow, printTopDelimiterRow, printBottomDelimiterRow
 }
 
 func loadKubeConfig() (*rest.Config, error) {
