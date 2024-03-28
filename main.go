@@ -336,6 +336,7 @@ func runFunctions(printTopDelimiterRow func(), printDataRow func(row []string), 
 	printBottomDelimiterRow()
 }
 
+// voir pour utiliser https://github.com/olekukonko/tablewriter
 func loadFunctions(tableData [][]string) (func(row []string), func(), func(), func()) {
 	alternateColor := true
 	var color string
