@@ -63,8 +63,5 @@ Metrics for Namespace: networking
 | source-controller-7c8f657856-sr7ll        | manager                  | 17 m      | 50 m        | 1000 m    | 97.42MiB  | 64MiB       | 1GiB      |                |
 | ...                                       | ...                      | ...       | ...         | ...       | ...       | ...         | ...       |                |
 
-## Demo
-![KtopGif](https://github.com/VegaCorporoptions/Ktop/blob/ec55df55d3c6fe7a72155b030927d419daa019dd/ktop.gif)
-
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.
