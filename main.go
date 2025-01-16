@@ -21,10 +21,12 @@ import (
 const (
 	SpotTolerationKey   = "kubernetes.azure.com/scalesetpriority"
 	SpotTolerationValue = "spot"
+	colorgrid           = pterm.BgDarkGray
 )
 
 var (
-	nodeName string
+	nodeName       string
+	alternateStyle = pterm.NewStyle(colorgrid) // Set alternate row style grey
 )
 
 func printHelp() {
@@ -169,9 +171,6 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	// Initialize the progress bar
 	bar, _ := pterm.DefaultProgressbar.WithTotal(len(pods.Items)).WithTitle("Running").WithRemoveWhenDone().Start()
 
-	// Create a variable to alternate row colors in tables
-	var colorgrid = false
-
 	// Create an array to store pod data
 	var podTableData pterm.TableData
 	var totalTableData pterm.TableData
@@ -238,38 +237,19 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 				}
 			}
 
-			if colorgrid {
-				// Add data to the table row, including spot tolerance
-				row := []string{
-					pterm.BgDarkGray.Sprint(pod.Name),
-					pterm.BgDarkGray.Sprint(containerName),
-					pterm.BgDarkGray.Sprintf("%d m", cpuUsage),
-					pterm.BgDarkGray.Sprintf("%d m", cpuRequest),
-					pterm.BgDarkGray.Sprintf("%d m", cpuLimit),
-					pterm.BgDarkGray.Sprint(units.BytesSize(float64(memoryUsage))),
-					pterm.BgDarkGray.Sprint(units.BytesSize(float64(memoryRequest))),
-					pterm.BgDarkGray.Sprint(units.BytesSize(float64(memoryLimit))),
-					pterm.BgDarkGray.Sprint(spotToleration),
-				}
-				podTableData = append(podTableData, row)
-			} else {
-				// Add data to the table row without color
-				row := []string{
-					pod.Name,
-					containerName,
-					pterm.Sprintf("%d m", cpuUsage),
-					pterm.Sprintf("%d m", cpuRequest),
-					pterm.Sprintf("%d m", cpuLimit),
-					units.BytesSize(float64(memoryUsage)),
-					units.BytesSize(float64(memoryRequest)),
-					units.BytesSize(float64(memoryLimit)),
-					spotToleration,
-				}
-				podTableData = append(podTableData, row)
+			// Add data to the table row without color
+			row := []string{
+				pod.Name,
+				containerName,
+				pterm.Sprintf("%d m", cpuUsage),
+				pterm.Sprintf("%d m", cpuRequest),
+				pterm.Sprintf("%d m", cpuLimit),
+				units.BytesSize(float64(memoryUsage)),
+				units.BytesSize(float64(memoryRequest)),
+				units.BytesSize(float64(memoryLimit)),
+				spotToleration,
 			}
-
-			// Toggle the colorgrid value
-			colorgrid = !colorgrid
+			podTableData = append(podTableData, row)
 
 			// Add to the totals
 			totalCPUUsage += cpuUsage
@@ -314,9 +294,9 @@ func printPodMetrics(node corev1.Node, clientset *kubernetes.Clientset, metricsC
 	podTableData = append(podTableData, totalPods)
 
 	if nodeName == "" {
-		pterm.DefaultTable.WithHeaderRowSeparator("─").WithBoxed().WithHasHeader().WithData(totalTableData).Render()
+		pterm.DefaultTable.WithHeaderRowSeparator("─").WithBoxed().WithHasHeader().WithAlternateRowStyle(alternateStyle).WithData(totalTableData).Render()
 	} else {
-		pterm.DefaultTable.WithHeaderRowSeparator("─").WithBoxed().WithHasHeader().WithData(podTableData).Render()
+		pterm.DefaultTable.WithHeaderRowSeparator("─").WithBoxed().WithHasHeader().WithAlternateRowStyle(alternateStyle).WithData(podTableData).Render()
 	}
 }
 
