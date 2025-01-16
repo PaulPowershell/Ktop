@@ -135,7 +135,7 @@ func main() {
 func printNodeMetrics(node corev1.Node) {
 	// Initialize columns with headers
 	nodeTableData := pterm.TableData{
-		{"Node", "CPU Capacity", "CPU Allocatable", "Mem Capacity", "Mem Allocatable"},
+		{"Node", "CPU Capacity", "CPU Allocatable", "Mem Capacity", "Mem Allocatable", "Zone"},
 	}
 
 	// Get allocatable resources of the node
@@ -144,6 +144,7 @@ func printNodeMetrics(node corev1.Node) {
 	cpuTotalUsage := pterm.Sprintf("%d m", node.Status.Allocatable.Cpu().MilliValue())
 	memoryTotalCapacity := node.Status.Capacity.Memory().Value()
 	memoryTotalUsage := node.Status.Allocatable.Memory().Value()
+	nodeZone := node.Labels["topology.kubernetes.io/zone"]
 
 	// Add a row for the total
 	totalRow := []string{
@@ -152,6 +153,7 @@ func printNodeMetrics(node corev1.Node) {
 		cpuTotalUsage,
 		units.BytesSize(float64(memoryTotalCapacity)),
 		units.BytesSize(float64(memoryTotalUsage)),
+		nodeZone,
 	}
 	nodeTableData = append(nodeTableData, totalRow)
 
